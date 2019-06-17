@@ -540,7 +540,7 @@ def _extract_from_html(msg_body):
     #    of replacing data outside the <tag> which might be essential to
     #    the customer.
     remove_namespaces(html_tree_copy)
-    return html.tostring(html_tree_copy)
+    return html.tostring(html_tree_copy, encoding='unicode')
 
 
 def remove_namespaces(root):

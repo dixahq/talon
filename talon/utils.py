@@ -191,8 +191,11 @@ def html_fromstring(s):
 def html_document_fromstring(s):
     """Parse html tree from string. Return None if the string can't be parsed.
     """
-    if isinstance(s, six.text_type):
-        s = s.encode('utf8')
+    # html5lib doesn't allow us to pass encodings to the parser because reasons, so it defaults wo Windows-1252
+    # The decoding afterwards is done in UTF-8, and while this works fine for english alphabet characters,
+    # other characters are mis-decoded
+    # We encode the string to unicode so that it goes through the unicode flow and all is well in the world
+    s = unicode(s)
     try:
         if html_too_big(s):
             return None
