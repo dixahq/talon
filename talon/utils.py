@@ -264,4 +264,4 @@ _RE_EXCESSIVE_NEWLINES = re.compile("\n{2,10}")
 
 # an extensive research shows that exceeding this limit
 # might lead to excessive processing time
-_MAX_TAGS_COUNT = 419
+_MAX_TAGS_COUNT = 2000
