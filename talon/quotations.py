@@ -210,8 +210,8 @@ def extract_from(msg_body, content_type='text/plain'):
             return extract_from_plain(msg_body)
         elif content_type == 'text/html':
             return extract_from_html(msg_body)
-    except Exception:
-        log.exception('ERROR extracting message')
+    except Exception as e:
+        log.exception('ERROR extracting message: {}'.format(repr(e)))
 
     return msg_body
 
@@ -400,6 +400,7 @@ def extract_from_plain(msg_body):
     # concatenate lines, change links back, strip and return
     msg_body = delimiter.join(lines)
     msg_body = postprocess(msg_body)
+    log.info('extract_from_plain ok')
     return msg_body
 
 
@@ -453,6 +454,7 @@ def _extract_from_html(msg_body):
     then deleting necessary tags.
     """
     if msg_body.strip() == b'':
+        log.error('msg_body.strip() == b""')
         return msg_body
 
     msg_body = msg_body.replace(b'\r\n', b'\n')
@@ -462,6 +464,7 @@ def _extract_from_html(msg_body):
     html_tree = html_document_fromstring(msg_body)
 
     if html_tree is None:
+        log.error('html_tree is None')
         return msg_body
 
     cut_quotations = (html_quotations.cut_gmail_quote(html_tree) or
@@ -481,6 +484,7 @@ def _extract_from_html(msg_body):
 
     # Don't process too long messages
     if len(lines) > MAX_LINES_COUNT:
+        log.error('len(lines) > MAX_LINES_COUNT')
         return msg_body
 
     # Collect checkpoints on each line
@@ -500,6 +504,7 @@ def _extract_from_html(msg_body):
     lines_were_deleted, first_deleted, last_deleted = return_flags
 
     if not lines_were_deleted and not cut_quotations:
+        log.error('not lines_were_deleted and not cut_quotations')
         return msg_body
 
     if lines_were_deleted:
@@ -514,6 +519,7 @@ def _extract_from_html(msg_body):
         )
 
     if _readable_text_empty(html_tree_copy):
+        log.error('_readable_text_empty(html_tree_copy)')
         return msg_body
 
     # NOTE: We remove_namespaces() because we are using an HTML5 Parser, HTML
@@ -540,6 +546,7 @@ def _extract_from_html(msg_body):
     #    of replacing data outside the <tag> which might be essential to
     #    the customer.
     remove_namespaces(html_tree_copy)
+    log.info('_extract_from_html ok')
     return html.tostring(html_tree_copy, encoding='unicode')
 
 
