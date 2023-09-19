@@ -367,6 +367,16 @@ Objet : Follow Up
 Blah-blah-blah
 """))
 
+def test_polish_multiline_from_block():
+    eq_('Lorem ipsum', quotations.extract_from_plain(
+    u"""Lorem ipsum
+
+Od : Brendan xxx [mailto:brendan.xxx@xxx.com]
+Wyslano : vendredi 23 janvier 2015 16:39
+
+Blah-blah-blah
+"""))
+
 def test_french_from_block():
     eq_('Lorem ipsum', quotations.extract_from_plain(
     u"""Lorem ipsum
@@ -538,6 +548,18 @@ To: rob@example.com
 Text"""
     eq_(msg_body, quotations.extract_from_plain(msg_body))
 
+def test_dont_parse_quotations_for_forwarded_messages_with_spaces():
+    msg_body = """FYI
+
+   ---------- Forwarded message ----------
+From: bob@example.com
+Date: Tue, Sep 4, 2012 at 1:35 PM
+Subject: Two
+line subject
+To: rob@example.com
+
+Text"""
+    eq_(msg_body, quotations.extract_from_plain(msg_body))
 
 def test_forwarded_message_in_quotations():
     msg_body = """Blah
