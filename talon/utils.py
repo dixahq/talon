@@ -10,7 +10,6 @@ from lxml.html import html5parser
 
 from talon.constants import RE_DELIMITER
 
-
 def get_delimiter(msg_body: str) -> str:
     delimiter = RE_DELIMITER.search(msg_body)
     if delimiter:
@@ -125,6 +124,51 @@ def _html5lib_parser() -> HTMLParser:
         namespaceHTMLElements=False
     )
 
+FILTERS = {}
+
+def apply_filters(filter_name, filter_value, **kwargs):
+    global FILTERS
+    try:
+        FILTERS[filter_name]
+    except:
+        FILTERS[filter_name] = {}
+
+    for filters in FILTERS[filter_name].values():
+        for function in filters:
+            filter_value = function(filter_value, **kwargs)
+
+    return filter_value
+
+def add_filter(filter_name, function, priority = 0):
+    global FILTERS
+    try:
+        FILTERS[filter_name]
+    except:
+        FILTERS[filter_name] = {}
+
+    try:
+        FILTERS[filter_name][priority]
+    except:
+        FILTERS[filter_name][priority] = []
+        FILTERS[filter_name] = dict(sorted(FILTERS[filter_name].items()))
+
+    FILTERS[filter_name][priority].append(function)
+
+    return
+
+def remove_filter(filter_name, function, priority = 0):
+    global FILTERS
+    FILTERS[filter_name][priority].remove(function)
+
+    return
+
+def compile_pattern(pattern_name, pattern):
+    filtered_match_pattern = apply_filters(pattern_name, pattern)
+    filtered_pattern = r'((?:{0}).*)'.format(filtered_match_pattern)
+    compiled_expression = re.compile(filtered_pattern, re.I | re.X | re.M | re.S)
+
+    return compiled_expression
+
 
 _UTF8_DECLARATION = ('<meta http-equiv="Content-Type" content="text/html;'
                      'charset=utf-8">')
@@ -133,6 +177,3 @@ _BLOCKTAGS = ['div', 'p', 'ul', 'li', 'h1', 'h2', 'h3']
 _HARDBREAKS = ['br', 'hr', 'tr']
 
 _RE_EXCESSIVE_NEWLINES = re.compile("\n{2,10}")
-
-# an extensive research shows that exceeding this limit might lead to excessive processing time
-_MAX_TAGS_COUNT = 2000

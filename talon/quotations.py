@@ -78,9 +78,9 @@ RE_ON_DATE_WROTE_SMB = re.compile(
     u'(-*[>]?[ ]?({0})[ ].*(.*\n){{0,2}}.*({1})[ ]*.*:)'.format(
         # Beginning of the line
         u'|'.join((
-        	'Op',
-        	#German
-        	'Am'
+            'Op',
+            #German
+            'Am'
         )),
         # Ending of the line
         u'|'.join((

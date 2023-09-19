@@ -6,7 +6,7 @@ messages (without quoted messages) from html
 from __future__ import absolute_import
 import regex as re
 
-from talon.utils import cssselect 
+from talon.utils import cssselect
 
 CHECKPOINT_PREFIX = '#!%!'
 CHECKPOINT_SUFFIX = '!%!#'
@@ -216,7 +216,7 @@ def cut_from_block(html_message):
 
         if RE_FWD.match(block.getparent().text or ''):
             return False
-        
+
         while(block.getnext() is not None):
             block.getparent().remove(block.getnext())
         block.getparent().remove(block)

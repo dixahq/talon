@@ -8,14 +8,17 @@ applying features to them.
 """
 
 from __future__ import absolute_import
-from talon.signature.constants import (SIGNATURE_MAX_LINES,
-                                       TOO_LONG_SIGNATURE_LINE)
-from talon.signature.learning.helpers import *
+from talon.constants import (SIGNATURE_MAX_LINES, TOO_LONG_SIGNATURE_LINE,RE_SEPARATOR,RE_SPECIAL_CHARS,RE_FOOTER_WORDS,RE_NAME,RE_EMAIL,RE_URL,RE_RELAX_PHONE,RE_SIGNATURE_WORDS)
+from talon.signature.learning.helpers import (binary_regex_search, binary_regex_match, many_capitalized_words,punctuation_percent,contains_sender_names)
 from six.moves import zip
 from functools import reduce
-
+from talon.utils import apply_filters
+import regex as re
 
 def features(sender=''):
+    signature_words = apply_filters('talon_email_signature_words',RE_SIGNATURE_WORDS)
+    footer_words = apply_filters('talon_email_footer_words',RE_FOOTER_WORDS)
+
     '''Returns a list of signature features.'''
     return [
         # This one isn't from paper.
@@ -36,7 +39,9 @@ def features(sender=''):
         # Line has a sequence of 10 or more special characters.
         binary_regex_search(RE_SPECIAL_CHARS),
         # Line contains any typical signature words.
-        binary_regex_search(RE_SIGNATURE_WORDS),
+        binary_regex_search(re.compile(signature_words)),
+        # Line contains any typical signature footer words
+        binary_regex_search(re.compile(footer_words)),
         # Line contains a pattern like Vitor R. Carvalho or William W. Cohen.
         binary_regex_search(RE_NAME),
         # Percentage of punctuation symbols in the line is larger than 50%

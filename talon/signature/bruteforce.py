@@ -1,65 +1,11 @@
 from __future__ import absolute_import
 
 import logging
-
-import regex as re
-
-from talon.signature.constants import (SIGNATURE_MAX_LINES,
-                                       TOO_LONG_SIGNATURE_LINE)
-from talon.utils import get_delimiter
+import Levenshtein
+from talon.constants import (SIGNATURE_MAX_LINES,TOO_LONG_SIGNATURE_LINE,RE_SIGNATURE,RE_FOOTER, KNOWN_FOOTER_LINES,RE_SIGNATURE_CANDIDATE)
+from talon.utils import get_delimiter, apply_filters, compile_pattern
 
 log = logging.getLogger(__name__)
-
-# regex to fetch signature based on common signature words
-RE_SIGNATURE = re.compile(r'''
-               (
-                   (?:
-                       ^[\s]*--*[\s]*[a-z \.]*$
-                       |
-                       ^thanks[\s,!]*$
-                       |
-                       ^regards[\s,!]*$
-                       |
-                       ^cheers[\s,!]*$
-                       |
-                       ^best[ a-z]*[\s,!]*$
-                   )
-                   .*
-               )
-               ''', re.I | re.X | re.M | re.S)
-
-# signatures appended by phone email clients
-RE_PHONE_SIGNATURE = re.compile(r'''
-               (
-                   (?:
-                       ^sent[ ]{1}from[ ]{1}my[\s,!\w]*$
-                       |
-                       ^sent[ ]from[ ]Mailbox[ ]for[ ]iPhone.*$
-                       |
-                       ^sent[ ]([\S]*[ ])?from[ ]my[ ]BlackBerry.*$
-                       |
-                       ^Enviado[ ]desde[ ]mi[ ]([\S]+[ ]){0,2}BlackBerry.*$
-                   )
-                   .*
-               )
-               ''', re.I | re.X | re.M | re.S)
-
-# see _mark_candidate_indexes() for details
-# c - could be signature line
-# d - line starts with dashes (could be signature or list item)
-# l - long line
-RE_SIGNATURE_CANDIDATE = re.compile(r'''
-    (?P<candidate>c+d)[^d]
-    |
-    (?P<candidate>c+d)$
-    |
-    (?P<candidate>c+)
-    |
-    (?P<candidate>d)[^d]
-    |
-    (?P<candidate>d)$
-''', re.I | re.X | re.M | re.S)
-
 
 def extract_signature(msg_body):
     '''
@@ -79,23 +25,20 @@ def extract_signature(msg_body):
 
         # make an assumption
         stripped_body = msg_body.strip()
-        phone_signature = None
-
-        # strip off phone signature
-        phone_signature = RE_PHONE_SIGNATURE.search(msg_body)
-        if phone_signature:
-            stripped_body = stripped_body[:phone_signature.start()]
-            phone_signature = phone_signature.group()
+        footer = None
 
         # decide on signature candidate
         lines = stripped_body.splitlines()
-        candidate = get_signature_candidate(lines)
+
+        (candidate, lines, footer) = get_signature_candidate(lines)
         candidate = delimiter.join(candidate)
 
         # try to extract signature
-        signature = RE_SIGNATURE.search(candidate)
+        sig_pattern = compile_pattern('talon_email_signature_patterns', RE_SIGNATURE)
+        signature = sig_pattern.search(candidate)
+
         if not signature:
-            return (stripped_body.strip(), phone_signature)
+            return (stripped_body.strip(), footer)
         else:
             signature = signature.group()
             # when we splitlines() and then join them
@@ -105,11 +48,11 @@ def extract_signature(msg_body):
             stripped_body = delimiter.join(lines)
             stripped_body = stripped_body[:-len(signature)]
 
-            if phone_signature:
-                signature = delimiter.join([signature, phone_signature])
+            if footer:
+                footer = delimiter.join(footer)
+                signature = delimiter.join([signature, footer])
 
-            return (stripped_body.strip(),
-                    signature.strip())
+            return (stripped_body.strip(), signature.strip())
     except Exception:
         log.exception('ERROR extracting signature')
         return (msg_body, None)
@@ -130,22 +73,66 @@ def get_signature_candidate(lines):
 
     # if message is empty or just one line then there is no signature
     if len(non_empty) <= 1:
-        return []
+        return ([],lines,None)
 
     # we don't expect signature to start at the 1st line
     candidate = non_empty[1:]
+
+    # Strip know footer lines
+
+    footer_start_idx = len(candidate)-1
+    footer = None
+
+    footer_pattern = compile_pattern('talon_email_footer_patterns', RE_FOOTER)
+    footer_lines = apply_filters('talon_email_footer_lines', KNOWN_FOOTER_LINES)
+    similarity_ratio = apply_filters('talon_email_footer_lines_ratio', 0.75)
+    found_footer = False
+    for i, line_idx in reversed(list(enumerate(candidate))):
+        is_footer_line = False
+
+        if footer_pattern.search(lines[line_idx]):
+            is_footer_line = True
+            found_footer = True
+
+        if (is_footer_line):
+            footer_start_idx = i
+            continue
+        else:
+            for footer_line in footer_lines:
+                if Levenshtein.ratio(footer_line, lines[line_idx]) > similarity_ratio:
+                    is_footer_line = True
+                    found_footer = True
+                    footer_start_idx = i
+                    break
+
+            if is_footer_line:
+                continue
+            else:
+                break
+
+    # There is a likely scenario that one line replies with a footer such as 'sent from my iphone' won't be caught.
+    # In this case if there are only 2 lines in an email and one of them is a footer, we send back 0 candidates
+    if (footer_start_idx != len(candidate)-1):
+        sig_stop = footer_start_idx
+        footer = lines[candidate[sig_stop]:]
+        lines = lines[:candidate[sig_stop]]
+        candidate = candidate[:sig_stop]
+    elif ((len(candidate) == 1) and found_footer):
+        footer = lines[candidate[footer_start_idx]:]
+        lines = lines[:candidate[footer_start_idx]]
+        candidate = []
+
     # signature shouldn't be longer then SIGNATURE_MAX_LINES
     candidate = candidate[-SIGNATURE_MAX_LINES:]
-
     markers = _mark_candidate_indexes(lines, candidate)
     candidate = _process_marked_candidate_indexes(candidate, markers)
 
     # get actual lines for the candidate instead of indexes
     if candidate:
         candidate = lines[candidate[0]:]
-        return candidate
+        return (candidate,lines,footer)
 
-    return []
+    return ([],lines,footer)
 
 
 def _mark_candidate_indexes(lines, candidate):
@@ -160,16 +147,16 @@ def _mark_candidate_indexes(lines, candidate):
     >>> _mark_candidate_lines(['Some text', '', '-', 'Bob'], [0, 2, 3])
     'cdc'
     """
+
     # at first consider everything to be potential signature lines
     markers = list('c' * len(candidate))
-
     # mark lines starting from bottom up
     for i, line_idx in reversed(list(enumerate(candidate))):
         if len(lines[line_idx].strip()) > TOO_LONG_SIGNATURE_LINE:
             markers[i] = 'l'
         else:
             line = lines[line_idx].strip()
-            if line.startswith('-') and line.strip("-"):
+            if (line.startswith('-') and line.strip("-")):
                 markers[i] = 'd'
 
     return "".join(markers)

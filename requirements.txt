@@ -9,3 +9,4 @@ regex>=1
 scikit-learn>=1.0.0
 scipy
 six>=1.10.0
+Levenshtein>=0.21.1

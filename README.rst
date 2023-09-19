@@ -5,6 +5,18 @@ Mailgun library to extract message quotations and signatures.
 
 If you ever tried to parse message quotations or signatures you know that absence of any formatting standards in this area could make this task a nightmare. Hopefully this library will make your life much easier. The name of the project is inspired by TALON - multipurpose robot designed to perform missions ranging from reconnaissance to combat and operate in a number of hostile environments. That’s what a good quotations and signature parser should be like :smile:
 
+Filters
+-----
+
+Filters have been put in place to allow you to customize talon.
+
+- `talon_email_signature_patterns`
+- `talon_email_signature_words`
+- `talon_email_footer_patterns`
+- `talon_email_footer_words`
+- `talon_email_footer_lines`
+- `talon_email_footer_lines_ratio`
+
 Usage
 -----
 
@@ -111,7 +123,7 @@ To regenerate the model files, you can run
 or
 
 .. code:: python
-    
+
     from talon.signature import EXTRACTOR_FILENAME, EXTRACTOR_DATA
     from talon.signature.learning.classifier import train, init
     train(init(), EXTRACTOR_DATA, EXTRACTOR_FILENAME)
@@ -137,8 +149,8 @@ talon comes with a pre-processed dataset and a pre-trained classifier. To retrai
 .. code:: python
 
     from talon.signature.learning.dataset import build_extraction_dataset
-    from talon.signature.learning import classifier as c 
-    
+    from talon.signature.learning import classifier as c
+
     build_extraction_dataset("/path/to/your/P/folder", "/path/to/talon/signature/data/train.data")
     c.train(c.init(), "/path/to/talon/signature/data/train.data", "/path/to/talon/signature/data/classifier")
 
