@@ -20,18 +20,43 @@ def get_delimiter(msg_body: str) -> str:
     return delimiter
 
 
+def _drop_preserving_tail(el: _Element) -> None:
+    """Remove `el` from its tree while keeping the text that follows it.
+
+    lxml keeps the text after an element's closing tag on that element's
+    `.tail`, and `remove()` discards the tail along with the element. In email
+    bodies that text is frequently the message itself. Seznam.cz webmail, for
+    example, emits
+
+        <style>...</style>Reply text<br><aside>quote header</aside>
+
+    where the reply is the <style> element's tail, so a plain remove() deletes
+    the customer's message. Re-attach the tail to the previous sibling (or to
+    the parent's own text when there is no previous sibling) before removing.
+    """
+    parent = el.getparent()
+
+    # an element with no parent does not impact produced text
+    if parent is None:
+        return
+
+    tail = el.tail or ''
+    if tail:
+        previous = el.getprevious()
+        if previous is not None:
+            previous.tail = (previous.tail or '') + tail
+        else:
+            parent.text = (parent.text or '') + tail
+
+    parent.remove(el)
+
+
 def html_tree_to_text(tree: _Element) -> str:
     for style in CSSSelector('style')(tree):
-        style.getparent().remove(style)
+        _drop_preserving_tail(style)
 
     for c in tree.xpath('//comment()'):
-        parent = c.getparent()
-
-        # comment with no parent does not impact produced text
-        if parent is None:
-            continue
-
-        parent.remove(c)
+        _drop_preserving_tail(c)
 
     text = ""
     for el in tree.iter():

@@ -393,6 +393,27 @@ def test_gmail_forwarded_msg():
     eq_(RE_WHITESPACE.sub('', msg_body), RE_WHITESPACE.sub('', extracted))
 
 
+def test_seznam_reply_after_style_block_is_kept():
+    """The reply must survive when it sits on the <style> element's lxml tail.
+
+    Seznam.cz webmail carries the sender's template CSS into <body> ahead of the
+    new text, so the reply becomes the tail of <style>. _readable_text_empty()
+    runs html_tree_to_text() on the tree that is about to be serialised, and a
+    plain remove() of <style> used to take the tail — the whole reply — with it.
+    """
+    msg_body = (
+        '<html><body><style>p{color:red}.x{margin:0}</style>'
+        'Predejte to konzultantovi&nbsp;'
+        '<br><aside>---------- Puvodni e-mail ----------<br>'
+        'Od: Team &lt;shop@example.com&gt;<br>Komu: user@example.com</aside>'
+        '<br><blockquote data-email="shop@example.com">'
+        '<div>quoted history</div></blockquote></body></html>'
+    )
+    extracted = quotations.extract_from_html(msg_body)
+    ok_('Predejte to konzultantovi' in extracted, extracted)
+    assert_false('quoted history' in extracted, extracted)
+
+
 def test_readable_html_empty():
     msg_body = """
 <blockquote>
