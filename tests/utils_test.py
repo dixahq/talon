@@ -65,6 +65,34 @@ def test_comment_no_parent():
     eq_("no comment", u.html_tree_to_text(d))
 
 
+def test_style_tail_is_preserved():
+    # Seznam.cz webmail puts the reply directly after </style>, so it lands on
+    # the <style> element's lxml tail. Removing the element must not take it.
+    s = '<html><body><style>p{color:red}</style>REPLY TEXT<br>rest</body></html>'
+    d = u.html_document_fromstring(s)
+    text = u.html_tree_to_text(d)
+    ok_('REPLY TEXT' in text, text)
+    ok_('color:red' not in text, text)
+
+
+def test_comment_tail_is_preserved():
+    s = '<html><body><p>before<!-- COMMENT --> after</p></body></html>'
+    d = u.html_document_fromstring(s)
+    text = u.html_tree_to_text(d)
+    ok_('after' in text, text)
+    ok_('COMMENT' not in text, text)
+
+
+def test_style_tail_preserved_after_previous_sibling():
+    # tail re-attaches to the previous sibling, not the parent, when one exists
+    s = ('<html><body>first<span>x</span><style>p{color:red}</style>'
+         'REPLY TEXT<br>rest</body></html>')
+    d = u.html_document_fromstring(s)
+    text = u.html_tree_to_text(d)
+    ok_('REPLY TEXT' in text, text)
+    ok_('first' in text, text)
+
+
 @patch.object(u, 'html_fromstring', Mock(return_value=None))
 def test_bad_html_to_text():
     bad_html = "one<br>two<br>three"
